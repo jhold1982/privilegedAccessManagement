@@ -26,13 +26,6 @@ This repository contains a comprehensive set of macOS endpoint security and Priv
 - Root/Administrator access for full functionality
 - Optional: ClamAV for advanced malware scanning
 
-## 🚀 Installation
-
-### Clone the Repository
-```bash
-git clone https://github.com/jhold1982/privilegedAccessManagement.git
-cd privilegedAccessManagement
-chmod +x *.sh
 ```
 
 ## 🛠 Usage
@@ -87,12 +80,4 @@ These scripts help support compliance with:
 - PCI DSS Access Control Requirements
 
 ## 📄 License
-[Insert Appropriate License - e.g., MIT, Apache 2.0]
-
-## 🤝 Contributing
-Contributions, issues, and feature requests are welcome. Feel free to check [issues page](https://github.com/jhold1982/privilegedAccessManagement/issues).
-
-## 📞 Support
-For issues or questions, please open a GitHub issue or contact the repository maintainer.
-
-**Disclaimer**: These scripts are provided as examples and should be thoroughly tested in your specific environment before production use.
+[MIT]
