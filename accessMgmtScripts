@@ -1,0 +1,94 @@
+#!/bin/bash
+
+# 1. User Privilege Audit Script
+# Checks and logs user privilege escalation attempts and current privileges
+function audit_user_privileges() {
+    # Log current timestamp and user
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Privilege Audit for $(whoami)" >> /var/log/privilege_audit.log
+    
+    # List all groups current user belongs to
+    echo "User Groups:" >> /var/log/privilege_audit.log
+    groups >> /var/log/privilege_audit.log
+    
+    # Check sudo access
+    sudo -l >> /var/log/privilege_audit.log
+    
+    # List files with special permissions
+    find / -type f \( -perm -4000 -o -perm -2000 \) 2>/dev/null >> /var/log/special_permissions.log
+}
+
+# 2. Restricted Sudo Access Script
+# Creates a wrapper to log and restrict sudo usage
+function restricted_sudo() {
+    # Logging sudo attempts
+    if [[ $EUID -ne 0 ]]; then
+        logger -p auth.info "Sudo attempt by $(whoami) for command: $*"
+        
+        # Optional: Implement additional checks
+        # Example: Restrict sudo to specific times or from specific locations
+        current_hour=$(date +%H)
+        if [[ $current_hour -lt 08 || $current_hour -gt 18 ]]; then
+            echo "Sudo access restricted to business hours (8 AM - 6 PM)"
+            return 1
+        fi
+    fi
+    
+    # Execute sudo with original arguments
+    /usr/bin/sudo "$@"
+}
+
+# 3. Privileged Account Rotation Script
+function rotate_admin_password() {
+    # Generate a complex password
+    new_password=$(openssl rand -base64 12)
+    
+    # Rotate password for a specific admin account
+    dscl . -passwd /Users/adminuser "$new_password"
+    
+    # Optional: Store encrypted password in secure location
+    echo "$new_password" | openssl enc -aes-256-cbc -a -salt > /secure/password_vault.enc
+    
+    # Log password rotation
+    logger "Admin account password rotated at $(date)"
+}
+
+# 4. Privileged Session Monitoring
+function monitor_privileged_session() {
+    # Capture and log all commands run with elevated privileges
+    script -q -c "sudo -i" /var/log/privileged_session_$(date +%Y%m%d_%H%M%S).log
+}
+
+# 5. Device Authorization Script
+function check_device_authorization() {
+    # Check system integrity protection status
+    csrutil status
+    
+    # List authorized devices
+    system_profiler SPUSBDataType | grep -B6 "Vendor ID"
+    
+    # Check FileVault status
+    fdesetup status
+}
+
+# Main execution
+case "$1" in
+    "audit")
+        audit_user_privileges
+        ;;
+    "sudo")
+        restricted_sudo "${@:2}"
+        ;;
+    "rotate")
+        rotate_admin_password
+        ;;
+    "monitor")
+        monitor_privileged_session
+        ;;
+    "device")
+        check_device_authorization
+        ;;
+    *)
+        echo "Usage: $0 {audit|sudo|rotate|monitor|device}"
+        exit 1
+        ;;
+esac

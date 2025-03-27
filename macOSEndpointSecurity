@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# 1. System Hardening and Security Baseline
+function secure_system_baseline() {
+    # Disable unnecessary services
+    sudo launchctl disable system/com.apple.telnetd
+    sudo launchctl disable system/com.apple.afp
+    sudo launchctl disable system/com.apple.smbd
+
+    # Enforce FileVault encryption
+    sudo fdesetup enable
+
+    # Enable firewall
+    sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on
+    sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setblockall on
+    sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
+
+    # Disable unnecessary network services
+    sudo systemsetup -setremotelogin off
+    sudo systemsetup -setremoteappleevents off
+}
+
+# 2. Malware and Unauthorized Software Detection
+function malware_detection() {
+    # Check for suspicious processes
+    ps aux | grep -E '(suspicious|unknown|malware)' >> /var/log/suspicious_processes.log
+
+    # Scan for unsigned or untrusted applications
+    find /Applications -type d -name "*.app" -print0 | while read -d $'\0' app; do
+        codesign -dv "$app" 2>&1 | grep -i "valid\|authority" >> /var/log/app_verification.log
+    done
+
+    # ClamAV Antivirus Scan (requires ClamAV to be installed)
+    clamscan -r --exclude-dir="^/sys|^/dev" /
+}
+
+# 3. System Integrity and File Monitoring
+function file_integrity_monitor() {
+    # Create baseline of critical system files
+    find /System /Library /usr/bin /usr/sbin -type f -print0 | xargs -0 md5 > /var/log/system_baseline.md5
+
+    # Compare current state with baseline
+    find /System /Library /usr/bin /usr/sbin -type f -print0 | xargs -0 md5 | diff /var/log/system_baseline.md5 -
+}
+
+# 4. Network Security Audit
+function network_security_audit() {
+    # List all open network connections
+    sudo lsof -i -n -P | grep LISTEN >> /var/log/open_connections.log
+
+    # Check for unauthorized network sharing
+    sudo sharing -l >> /var/log/network_sharing.log
+
+    # Scan for open ports
+    sudo netstat -anp tcp | grep LISTEN >> /var/log/open_ports.log
+}
+
+# 5. Advanced Logging and Forensics
+function system_forensics() {
+    # Collect system logs
+    log show --predicate 'process != "kernel"' --last 1h > /var/log/system_logs_last_hour.log
+
+    # Capture network traffic (requires root)
+    sudo tcpdump -i en0 -w /var/log/network_capture_$(date +%Y%m%d_%H%M%S).pcap -G 3600
+
+    # Collect system profiler information
+    system_profiler SPHardwareDataType SPSoftwareDataType > /var/log/system_profile.log
+}
+
+# 6. User Activity Monitoring
+function user_activity_monitor() {
+    # Track user login/logout events
+    log show --predicate 'eventMessage CONTAINS "logged in" OR eventMessage CONTAINS "logged out"' \
+        --last 24h > /var/log/user_access.log
+
+    # Monitor sudo usage
+    grep "COMMAND" /var/log/auth.log | tail -n 50 > /var/log/sudo_usage.log
+}
+
+# Main execution
+case "$1" in
+    "harden")
+        secure_system_baseline
+        ;;
+    "malware")
+        malware_detection
+        ;;
+    "integrity")
+        file_integrity_monitor
+        ;;
+    "network")
+        network_security_audit
+        ;;
+    "forensics")
+        system_forensics
+        ;;
+    "users")
+        user_activity_monitor
+        ;;
+    *)
+        echo "Usage: $0 {harden|malware|integrity|network|forensics|users}"
+        exit 1
+        ;;
+esac
