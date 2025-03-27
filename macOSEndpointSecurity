@@ -1,14 +1,33 @@
 #!/bin/bash
 
-# 1. System Hardening and Security Baseline
+# SYSTEM HARDENING & SECURITY BASELINE
 function secure_system_baseline() {
+
     # Disable unnecessary services
     sudo launchctl disable system/com.apple.telnetd
     sudo launchctl disable system/com.apple.afp
     sudo launchctl disable system/com.apple.smbd
 
-    # Enforce FileVault encryption
+    # Check FileVault status
+    filevault_status=$(fdesetup status)
+
+    # Check if FileVault is already enabled
+    if [[ "$filevault_status" == *"FileVault is On"* ]]; then
+        echo "FileVault is already enabled. No action needed."
+        exit 0
+    fi
+
+    # If FileVault is not enabled, proceed
+    echo "FileVault is turned off, proceeding with setup..."
     sudo fdesetup enable
+
+    # Verify FileVault status
+    if [[ $? -eq 0]]; then
+        echo "FileVault has been enabled"
+    else
+        echo "Error: Failed to enable FileVault on Macintosh HD."
+        exit 1
+    fi
 
     # Enable firewall
     sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on
@@ -20,7 +39,7 @@ function secure_system_baseline() {
     sudo systemsetup -setremoteappleevents off
 }
 
-# 2. Malware and Unauthorized Software Detection
+# MALWARE & UNAUTHORIZED SOFTWARE DETECTION
 function malware_detection() {
     # Check for suspicious processes
     ps aux | grep -E '(suspicious|unknown|malware)' >> /var/log/suspicious_processes.log
@@ -29,12 +48,9 @@ function malware_detection() {
     find /Applications -type d -name "*.app" -print0 | while read -d $'\0' app; do
         codesign -dv "$app" 2>&1 | grep -i "valid\|authority" >> /var/log/app_verification.log
     done
-
-    # ClamAV Antivirus Scan (requires ClamAV to be installed)
-    clamscan -r --exclude-dir="^/sys|^/dev" /
 }
 
-# 3. System Integrity and File Monitoring
+# SYSTEM INTEGRITY & FILE MONITORING
 function file_integrity_monitor() {
     # Create baseline of critical system files
     find /System /Library /usr/bin /usr/sbin -type f -print0 | xargs -0 md5 > /var/log/system_baseline.md5
@@ -43,7 +59,7 @@ function file_integrity_monitor() {
     find /System /Library /usr/bin /usr/sbin -type f -print0 | xargs -0 md5 | diff /var/log/system_baseline.md5 -
 }
 
-# 4. Network Security Audit
+# NETWORK SECURITY AUDIT
 function network_security_audit() {
     # List all open network connections
     sudo lsof -i -n -P | grep LISTEN >> /var/log/open_connections.log
@@ -55,7 +71,7 @@ function network_security_audit() {
     sudo netstat -anp tcp | grep LISTEN >> /var/log/open_ports.log
 }
 
-# 5. Advanced Logging and Forensics
+# ADVANCED LOGGING & FORENSICS
 function system_forensics() {
     # Collect system logs
     log show --predicate 'process != "kernel"' --last 1h > /var/log/system_logs_last_hour.log
@@ -67,7 +83,7 @@ function system_forensics() {
     system_profiler SPHardwareDataType SPSoftwareDataType > /var/log/system_profile.log
 }
 
-# 6. User Activity Monitoring
+# USER ACTIVITY MONITORING
 function user_activity_monitor() {
     # Track user login/logout events
     log show --predicate 'eventMessage CONTAINS "logged in" OR eventMessage CONTAINS "logged out"' \
@@ -77,7 +93,7 @@ function user_activity_monitor() {
     grep "COMMAND" /var/log/auth.log | tail -n 50 > /var/log/sudo_usage.log
 }
 
-# Main execution
+# MAIN EXECUTION
 case "$1" in
     "harden")
         secure_system_baseline
